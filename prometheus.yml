@@ -1,0 +1,39 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['prometheus:9090']
+
+  - job_name: 'alloy'
+    static_configs:
+      - targets: ['alloy:12345'] # Alloy exposes its own health/metrics here
+
+  - job_name: 'host'
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  # Docker service discovery - automatically finds containers with exposed ports
+  - job_name: 'docker'
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 30s
+    relabel_configs:
+      # Only keep containers that have a metrics port exposed
+      - source_labels: [__meta_docker_container_label_com_docker_compose_project]
+        action: keep
+        regex: .+
+      # Use container name as instance label
+      - source_labels: [__meta_docker_container_name]
+        target_label: instance
+      # Add container labels as metrics labels
+      - source_labels: [__meta_docker_container_label_com_docker_compose_service]
+        target_label: service
+      # Set the scrape port from container's first exposed port
+      - source_labels: [__address__]
+        target_label: __address__
+      # Only scrape containers that expose common metrics ports or have a metrics label
+      - source_labels: [__meta_docker_port_private]
+        regex: (9090|12345|2112|8080|9091|9100|9256)
+        action: keep

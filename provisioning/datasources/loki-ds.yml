@@ -1,0 +1,21 @@
+apiVersion: 1
+datasources:
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    isDefault: true
+    editable: true
+    jsonData:
+      derivedFields:
+        # Link for Trace ID
+        - name: "TraceID"
+          matcherRegex: '"trace_id":"(\w+)"'
+          url: "$${__value.raw}"
+          datasourceUid: "Tempo"
+
+        # Link for Span ID
+        - name: "SpanID"
+          matcherRegex: '"span_id":"(\w+)"'
+          url: "$${__value.raw}"
+          datasourceUid: "Tempo"

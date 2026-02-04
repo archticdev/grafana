@@ -1,0 +1,34 @@
+apiVersion: 1
+datasources:
+  - name: Tempo
+    type: tempo
+    uid: P214B5B846CF3925F
+    url: http://tempo:3200
+    jsonData:
+      httpMethod: GET
+      # Disable these to stop Grafana from hitting 404 endpoints in v1.5.0
+#      traceQLStreaming: false
+#      search:
+#        hide: false # Ensure the old search tab is forced visible
+#      traceQL:
+#        enabled: false
+#      nodeGraph:
+#        enabled: true
+#      streamingEnabled:
+#        search: false
+      # Disable advanced search integrations to avoid 404s
+#      lokiSearch:
+#        datasourceUid: ''
+#      serviceMap:
+#        datasourceUid: ''
+      tracesToLogsV2:
+        datasourceUid: 'Loki'     # Must match the UID or Name of your Loki DS
+        tags: [ 'service' ]         # Tempo will filter Loki logs by this tag
+        mappedTags:
+          - key: 'service.name'
+            value: 'service'
+        mapTagNamesEnabled: true
+        spanStartTimeShift: '-1m' # Look 1 min before span started
+        spanEndTimeShift: '1m'   # Look 1 min after span ended
+        customQuery: true
+        query: '{service=~".+"} | json | trace_id = `$${__span.traceId}`'

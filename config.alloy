@@ -1,0 +1,182 @@
+livedebugging {
+  enabled = true
+}
+
+// --- SECTION 1: LOGS (Pull from Docker Socket) ---
+
+// Discover local Docker containers
+discovery.docker "all_containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+// Relabel the targets
+discovery.relabel "container_logs" {
+  targets = discovery.docker.all_containers.targets
+
+  // Require explicit opt-in via Docker label
+  rule {
+    source_labels = ["__meta_docker_container_label_monitor_enable"]
+    regex         = "true"
+    action        = "keep"
+  }
+
+  // Use the container's preferred label...
+  rule {
+    source_labels = ["__meta_docker_container_label_monitor_service_name"]
+    target_label  = "service"
+  }
+
+  // ... but fall back to the default Compose service name if 'service' is still empty
+  rule {
+    source_labels = ["service", "__meta_docker_container_label_com_docker_compose_service"]
+    regex         = ";(.*)"
+    replacement   = "$1"
+    target_label  = "service"
+  }
+
+  // Map our new component type label to the 'job' label
+  rule {
+    source_labels = ["__meta_docker_container_label_monitor_type"]
+    target_label  = "job"
+  }
+}
+
+// Get logs from the discovered containers
+loki.source.docker "logs" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.container_logs.output
+  forward_to = [loki.process.postgres_json_parser.receiver]
+}
+
+loki.process "postgres_json_parser" {
+  // Rule 1: Only attempt to parse if it's a database-logs component
+  // This keeps your app logs (console) and DB logs (JSON) from clashing
+  stage.match {
+    selector = "{job=\"db\"}"
+    stage.json {
+      expressions = {
+        message  = "message",
+        pg_level = "error_severity",
+        db       = "database_name",
+        user     = "user_name",
+      }
+    }
+
+    // Use a template to normalize the level.
+    // This is more resilient than regex replace.
+    stage.template {
+      source = "normalized_level"
+      template = `{{ if eq .pg_level "LOG" }}info{{ else if eq .pg_level "FATAL" }}critical{{ else if eq .pg_level "ERROR" }}error{{ else }}{{ .pg_level | lower }}{{ end }}`
+    }
+
+    stage.labels {
+      values = {
+        level = "normalized_level",
+        db    = null,
+      }
+    }
+  }
+
+  forward_to = [loki.write.to_collector.receiver]
+}
+
+loki.write "to_collector" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+
+
+
+// --- SECTION 2: TELEMETRY (Push from App via OTLP) ---
+
+otelcol.receiver.otlp "otlp_receiver" {
+  grpc { endpoint = "0.0.0.0:4317" }
+  http { endpoint = "0.0.0.0:4318" }
+
+  output {
+    metrics = [otelcol.exporter.prometheus.to_prom.input]
+    traces  = [otelcol.exporter.otlp.to_tempo.input]
+  }
+}
+
+// Convert OTLP metrics to Prometheus format
+otelcol.exporter.prometheus "to_prom" {
+  forward_to = [prometheus.remote_write.local_prom.receiver]
+}
+
+// Adding Tempo for Traces (See step 2)
+otelcol.exporter.otlp "to_tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls { insecure = true }
+  }
+}
+
+
+
+
+
+
+
+// --- SECTION 3: METRICS SCRAPING (Pull from Exporters) ---
+
+discovery.relabel "metrics_discovery" {
+  targets = discovery.docker.all_containers.targets
+
+  // 1. Only keep containers with your scrape label
+  rule {
+    source_labels = ["__meta_docker_container_label_prometheus_io_scrape"]
+    regex         = "true"
+    action        = "keep"
+  }
+
+  // 2. Set the address to the container's internal IP and the labeled port
+  rule {
+    source_labels = ["__meta_docker_container_label_prometheus_io_host", "__meta_docker_container_label_prometheus_io_port"]
+    separator     = ":"
+    regex         = "(.*):(.*)"
+    replacement   = "$1:$2"
+    target_label  = "__address__"
+  }
+
+  // Fall back on container name if the label was not set (it's optional)
+  rule {
+    source_labels = ["__address__", "__meta_docker_container_name"]
+    regex         = "^:(.*);/(.*)$"
+    replacement   = "$2:$1"
+    target_label  = "__address__"
+  }
+
+  // Set the service name to enable log correlation...
+  rule {
+    source_labels = ["__meta_docker_container_label_monitor_service_name"]
+    target_label  = "service"
+  }
+
+  // ... but fall back to the default Compose service name if 'service' is still empty
+  rule {
+    source_labels = ["service", "__meta_docker_container_label_com_docker_compose_service"]
+    regex         = ";(.*)"
+    replacement   = "$1"
+    target_label  = "service"
+  }
+
+  // Helps distinguish different components within the same composition
+  rule {
+    source_labels = ["__meta_docker_container_label_monitor_type"]
+    target_label  = "job"
+  }
+}
+
+prometheus.remote_write "local_prom" {
+  endpoint {
+    url = "http://prometheus:9090/api/v1/write"
+  }
+}
+
+prometheus.scrape "metrics_exporter" {
+  targets    = discovery.relabel.metrics_discovery.output
+  forward_to = [prometheus.remote_write.local_prom.receiver]
+}
