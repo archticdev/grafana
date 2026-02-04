@@ -10,4 +10,4 @@ grafana-remote apm-remote:
 	@cd $(GRAFANA_DIR) && RUNNING_MODE=remote docker compose --profile remote up -d
 
 grafana-down apm-down:
-	@cd $(GRAFANA_DIR) && docker compose down
+	@cd $(GRAFANA_DIR) && docker compose --profile local --profile remote down
