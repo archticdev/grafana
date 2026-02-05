@@ -6,7 +6,7 @@ GRAFANA_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 grafana apm:
 	@cd $(GRAFANA_DIR) && RUNNING_MODE=local docker compose --profile local up -d
 
-grafana-remote apm-remote:
+grafana-remote grafana-dev apm-remote apm-dev:
 	@cd $(GRAFANA_DIR) && RUNNING_MODE=remote docker compose --profile remote up -d
 
 grafana-down apm-down:
