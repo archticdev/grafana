@@ -2,4 +2,4 @@
 
 networks:
     common:
-        external: true
+        external: false
