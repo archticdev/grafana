@@ -1,10 +1,6 @@
 # Get the directory of this Makefile
 GRAFANA_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
-grafana:
-
-.PHONY: grafana grafana-remote grafana-down
-
 grafana: grafana-config
 	@cd $(GRAFANA_DIR) && RUNNING_MODE=local docker compose --profile local up -d
 
@@ -13,8 +9,8 @@ $(GRAFANA_DIR)/docker-compose.yml: $(GRAFANA_DIR)/docker-compose.network.yml $(G
 
 grafana-config: $(GRAFANA_DIR)/docker-compose.yml
 
-grafana-remote grafana-dev:
+grafana-remote grafana-dev: grafana-config
 	@cd $(GRAFANA_DIR) && RUNNING_MODE=remote docker compose --profile remote up -d
 
-grafana-down:
+grafana-down: grafana-config
 	@cd $(GRAFANA_DIR) && docker compose --profile local --profile remote down
