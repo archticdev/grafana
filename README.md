@@ -31,6 +31,29 @@ Runs the complete observability stack locally for standalone development and tes
 make
 ```
 
+```
+┌────────────────────────────┐
+│      Your Application      │
+└───-───────────┬────────────┘
+                │ (metrics/logs/traces)
+                ▼
+          ┌─────────┐
+          │  Alloy  │
+          └────┬────┘
+               │
+     ┌──────-──┼────────┐
+     ▼         ▼        ▼
+┌───────-──┐ ┌────┐ ┌───────┐
+│Prometheus│ │Loki│ │ Tempo │
+└────┬──-──┘ └─┬──┘ └───┬───┘
+     │         │        │
+     └────────-┼────────┘
+               ▼
+          ┌─────────┐
+          │ Grafana │
+          └─────────┘
+```
+
 ### Remote Mode (Hybrid)
 
 Runs **only Alloy locally** as a telemetry collector, publishing to a remote Grafana stack. 
@@ -38,6 +61,34 @@ This is ideal for offloading processing to a remote environment using [Bifrost](
 
 ```bash
 make remote
+```
+
+```
+┌───────────────────────────────────────┐
+│         Your Local Environment        │
+│     ┌──────────────────────────┐      │
+│     │     Your Application     │      │
+│     └───────────┬──---─────────┘      │
+│                 │                     │
+│                 ▼                     │
+│            ┌─────────┐                │
+│            │  Alloy  │                │
+│            └────┬────┘                │
+└───────-─────────┼─────────────────────┘
+                  │
+                  │ (via SSH tunnel)
+                  │
+┌───────-─────────▼─────────────────────┐
+│       Remote Grafana Stack            │
+│  ┌─────---──┐  ┌────┐  ┌─────┐        │
+│  │Prometheus│  │Loki│  │Tempo│        │
+│  └───┬──---─┘  └─┬──┘  └──┬──┘        │
+│      └─---───────┼────────┘           │
+│                  ▼                    │
+│             ┌─────────┐               │
+│             │ Grafana │               │
+│             └─────────┘               │
+└───────────────────────────────────────┘
 ```
 
 ## Quick Start
@@ -51,7 +102,7 @@ make remote
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/archticdev/bifrost.git
+   git clone https://github.com/archticdev/grafana.git
    cd grafana
    ```
 
@@ -118,63 +169,6 @@ Pre-configured data sources are in `provisioning/datasources/`:
 - `prometheus-ds.yml` - Prometheus metrics
 - `loki-ds.yml` - Loki logs
 - `tempo-ds.yaml` - Tempo traces
-
-## Architecture
-
-### Local Mode Architecture
-
-```
-┌────────────────────────────┐
-│      Your Application      │
-└───-───────────┬────────────┘
-                │ (metrics/logs/traces)
-                ▼
-          ┌─────────┐
-          │  Alloy  │
-          └────┬────┘
-               │
-     ┌──────-──┼────────┐
-     ▼         ▼        ▼
-┌───────-──┐ ┌────┐ ┌───────┐
-│Prometheus│ │Loki│ │ Tempo │
-└────┬──-──┘ └─┬──┘ └───┬───┘
-     │         │        │
-     └────────-┼────────┘
-               ▼
-          ┌─────────┐
-          │ Grafana │
-          └─────────┘
-```
-
-### Remote Mode Architecture
-
-```
-┌───────────────────────────────────────┐
-│         Your Local Environment        │
-│     ┌──────────────────────────┐      │
-│     │     Your Application     │      │
-│     └───────────┬──---─────────┘      │
-│                 │                     │
-│                 ▼                     │
-│            ┌─────────┐                │
-│            │  Alloy  │                │
-│            └────┬────┘                │
-└───────-─────────┼─────────────────────┘
-                  │
-                  │ (via SSH tunnel)
-                  │
-┌───────-─────────▼─────────────────────┐
-│       Remote Grafana Stack            │
-│  ┌─────---──┐  ┌────┐  ┌─────┐        │
-│  │Prometheus│  │Loki│  │Tempo│        │
-│  └───┬──---─┘  └─┬──┘  └──┬──┘        │
-│      └─---───────┼────────┘           │
-│                  ▼                    │
-│             ┌─────────┐               │
-│             │ Grafana │               │
-│             └─────────┘               │
-└───────────────────────────────────────┘
-```
 
 ## Use Cases
 
