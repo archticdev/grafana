@@ -1,11 +1,13 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-spec/master/schema/compose-spec.json
+
 name: "grafana"
 include:
-    - ../compositions/shared/docker-compose.network.yml
+    - ./docker-compose.network.yml
 services:
   alloy:
     image: grafana/alloy:latest
     networks:
-      - embroker
+      - {{NETWORK}}
     ports:
       - "12345:12345"
     volumes:
@@ -24,7 +26,7 @@ services:
   loki:
     image: grafana/loki:latest
     networks:
-      - embroker
+      - {{NETWORK}}
     user: "0:0"
     ports:
       - "3100:3100"
@@ -38,7 +40,7 @@ services:
   node-exporter:
     image: prom/node-exporter:latest
     networks:
-      - embroker
+      - {{NETWORK}}
     container_name: node-exporter
     restart: unless-stopped
     labels:
@@ -54,7 +56,7 @@ services:
   tempo:
     image: grafana/tempo:2.4.1
     networks:
-      - embroker
+      - {{NETWORK}}
     command: [ "-target=all", "-config.file=/etc/tempo.yaml" ]
     volumes:
       - ./tempo.yml:/etc/tempo.yaml
@@ -67,7 +69,7 @@ services:
   prometheus:
     image: prom/prometheus:latest
     networks:
-      - embroker
+      - {{NETWORK}}
     ports:
       - "9090:9090"
     volumes:
@@ -84,7 +86,7 @@ services:
   grafana:
     image: grafana/grafana:latest
     networks:
-      - embroker
+      - {{NETWORK}}
     ports:
       - "3000:3000"
     environment:
